@@ -1,18 +1,7 @@
 package com.ismytraindelayed.android;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.URLEncoder;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.StatusLine;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -54,38 +43,6 @@ public class IsMyTrainDelayedActivity extends Activity {
 	TextView departures;
 	TextView arrivals;
 	SharedPreferences settings;
-
-	// GET JSON FUNCTION
-	public String getJson(String url) {
-		StringBuilder builder = new StringBuilder();
-		HttpClient client = new DefaultHttpClient();
-		HttpGet httpGet = new HttpGet(url);
-		httpGet.setHeader("User-Agent", "com.ismytraindelayed.android");
-		try {
-			HttpResponse response = client.execute(httpGet);
-			StatusLine statusLine = response.getStatusLine();
-			int statusCode = statusLine.getStatusCode();
-			if (statusCode == 200) {
-				HttpEntity entity = response.getEntity();
-				InputStream content = entity.getContent();
-				BufferedReader reader = new BufferedReader(
-						new InputStreamReader(content));
-				String line;
-				while ((line = reader.readLine()) != null) {
-					builder.append(line);
-				}
-			} else {
-				return "{\"error\": \"Failed\"}";
-			}
-		} catch (ClientProtocolException e) {
-			e.printStackTrace();
-			return "{\"error\": \"Failed\"}";
-		} catch (IOException e) {
-			e.printStackTrace();
-			return "{\"error\": \"Failed\"}";
-		}
-		return builder.toString();
-	}
 
 	public void restoreSavedJourneys() {
 		LinearLayout main = (LinearLayout) findViewById(R.id.main);
@@ -137,7 +94,7 @@ public class IsMyTrainDelayedActivity extends Activity {
 			journey_text.setTextSize(14);
 			journey.addView(journey_text);
 			results.addView(journey, new TableLayout.LayoutParams(
-					LayoutParams.FILL_PARENT, LayoutParams.WRAP_CONTENT));
+					LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 		}
 	}
 
@@ -178,7 +135,8 @@ public class IsMyTrainDelayedActivity extends Activity {
 			editor.putString("saved_journeys", saved_journeys + from.getText()
 					+ "," + to.getText() + ";");
 			editor.commit();
-			Toast.makeText(getBaseContext(), "Journey Saved", Toast.LENGTH_LONG).show();
+			Toast.makeText(getBaseContext(), "Journey Saved", Toast.LENGTH_LONG)
+					.show();
 			return true;
 
 		case R.id.delete_journey:
@@ -189,7 +147,8 @@ public class IsMyTrainDelayedActivity extends Activity {
 					saved_journeys2.replace(from.getText() + "," + to.getText()
 							+ ";", ""));
 			editor2.commit();
-			Toast.makeText(getBaseContext(), "Removed Saved Journey", Toast.LENGTH_LONG).show();
+			Toast.makeText(getBaseContext(), "Removed Saved Journey",
+					Toast.LENGTH_LONG).show();
 			return true;
 
 		default:
@@ -230,14 +189,15 @@ public class IsMyTrainDelayedActivity extends Activity {
 	public boolean find_nearest(int field) {
 		if (geolocation == null) {
 			Toast.makeText(getBaseContext(),
-					"Still acquiring your location, please wait", Toast.LENGTH_LONG).show();
+					"Still acquiring your location, please wait",
+					Toast.LENGTH_LONG).show();
 			return true;
 		}
 		try {
-			String query = "http://ismytraindelayed.com/stations?lat="
+			String url = "http://ismytraindelayed.com/stations?lat="
 					+ geolocation.getLatitude() + "&lng="
 					+ geolocation.getLongitude();
-			JSONObject response = new JSONObject(getJson(query));
+			JSONObject response = Utils.getJson(url);
 			final AutoCompleteTextView from = (AutoCompleteTextView) findViewById(R.id.from);
 			final AutoCompleteTextView to = (AutoCompleteTextView) findViewById(R.id.to);
 			if (response.getString("name").length() > 0) {
@@ -290,7 +250,7 @@ public class IsMyTrainDelayedActivity extends Activity {
 							.encode(to.getText().toString());
 					String from_query = URLEncoder.encode(from.getText()
 							.toString());
-					String query = "http://ojp.nationalrail.co.uk/service/ldb/liveTrainsJson?departing="
+					String url = "http://ojp.nationalrail.co.uk/service/ldb/liveTrainsJson?departing="
 							+ departing
 							+ "&liveTrainsFrom="
 							+ from_query
@@ -299,7 +259,7 @@ public class IsMyTrainDelayedActivity extends Activity {
 							+ "&serviceId=abcdefghijk&from="
 							+ from_query
 							+ "&to=" + to_query;
-					JSONObject response = new JSONObject(getJson(query));
+					JSONObject response = Utils.getJson(url);
 					if (response.getString("error") == "Failed") {
 						TableRow error = new TableRow(getBaseContext());
 						TextView error_msg = new TextView(getBaseContext());
