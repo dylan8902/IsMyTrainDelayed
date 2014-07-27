@@ -1,8 +1,11 @@
 package com.ismytraindelayed.android;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import android.app.Activity;
@@ -12,6 +15,7 @@ import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.Html;
 import android.view.Menu;
@@ -43,174 +47,6 @@ public class IsMyTrainDelayedActivity extends Activity {
 	TextView departures;
 	TextView arrivals;
 	SharedPreferences settings;
-
-	public void restoreSavedJourneys() {
-		LinearLayout main = (LinearLayout) findViewById(R.id.main);
-		main.setFocusableInTouchMode(true);
-		results.removeAllViews();
-		if ((settings.contains("saved_journeys"))
-				&& (settings.getString("saved_journeys", null).length() > 0)) {
-			TableRow journey_title = new TableRow(this);
-			TextView journey_title_text = new TextView(this);
-			journey_title_text.setText("Your Saved Journeys");
-			journey_title_text.setTextSize(24);
-			journey_title_text.setPadding(0, 10, 0, 0);
-			journey_title.addView(journey_title_text);
-			results.addView(journey_title, new TableLayout.LayoutParams(
-					LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-
-			String saved_journeys = settings.getString("saved_journeys", null);
-			String[] journeys = saved_journeys.split(";");
-			for (int a = 0; a < journeys.length; a++) {
-				final String[] string = journeys[a].split(",");
-				TableRow journey = new TableRow(this);
-				TextView journey_text = new TextView(this);
-				journey_text.setPadding(0, 5, 0, 5);
-				journey_text.setTextSize(18);
-				journey_text.setText(string[0] + " and " + string[1]);
-				journey.addView(journey_text);
-				results.addView(journey, new TableLayout.LayoutParams(
-						LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-				journey.setOnClickListener(new View.OnClickListener() {
-					public void onClick(View v) {
-						from.setText(string[0]);
-						to.setText(string[1]);
-						button.performClick();
-					}
-				});
-			}
-		} else {
-			TableRow journey_title = new TableRow(this);
-			TextView journey_title_text = new TextView(this);
-			journey_title_text.setText("No Saved Journeys");
-			journey_title_text.setTextSize(24);
-			journey_title_text.setPadding(0, 10, 0, 0);
-			journey_title.addView(journey_title_text);
-			results.addView(journey_title, new TableLayout.LayoutParams(
-					LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-			TableRow journey = new TableRow(this);
-			TextView journey_text = new TextView(this);
-			journey_text.setText("Save frequent journeys to save time");
-			journey_text.setTextSize(14);
-			journey.addView(journey_text);
-			results.addView(journey, new TableLayout.LayoutParams(
-					LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-		}
-	}
-
-	// SET UP MENU HANDLERS
-	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-		MenuInflater inflater = getMenuInflater();
-		inflater.inflate(R.menu.menu, menu);
-		return true;
-	}
-
-	@Override
-	public boolean onOptionsItemSelected(MenuItem item) {
-		switch (item.getItemId()) {
-		case R.id.nearest_from:
-			find_nearest(0);
-			return true;
-
-		case R.id.nearest_to:
-			find_nearest(1);
-			return true;
-
-		case R.id.saved_journeys:
-			restoreSavedJourneys();
-			return true;
-
-		case R.id.save_journey:
-			SharedPreferences.Editor editor = settings.edit();
-			String saved_journeys;
-			if (settings.contains("saved_journeys"))
-				saved_journeys = settings.getString("saved_journeys", null);
-			else
-				saved_journeys = "";
-			editor.putString(
-					"saved_journeys",
-					saved_journeys.replace(from.getText() + "," + to.getText()
-							+ ";", ""));
-			editor.putString("saved_journeys", saved_journeys + from.getText()
-					+ "," + to.getText() + ";");
-			editor.commit();
-			Toast.makeText(getBaseContext(), "Journey Saved", Toast.LENGTH_LONG)
-					.show();
-			return true;
-
-		case R.id.delete_journey:
-			SharedPreferences.Editor editor2 = settings.edit();
-			String saved_journeys2 = settings.getString("saved_journeys", null);
-			editor2.putString(
-					"saved_journeys",
-					saved_journeys2.replace(from.getText() + "," + to.getText()
-							+ ";", ""));
-			editor2.commit();
-			Toast.makeText(getBaseContext(), "Removed Saved Journey",
-					Toast.LENGTH_LONG).show();
-			return true;
-
-		default:
-			return super.onOptionsItemSelected(item);
-		}
-	}
-
-	@Override
-	public boolean onPrepareOptionsMenu(Menu menu) {
-		if (departing) {
-			menu.getItem(3).setTitle("From Nearest Station");
-			menu.getItem(4).setTitle("To Nearest Station");
-		} else {
-			menu.getItem(3).setTitle("Into Nearest Station");
-			menu.getItem(4).setTitle("From Nearest Station");
-		}
-		if ((from.getText().length() > 0) && (to.getText().length() > 0)) {
-			String saved_journeys;
-			if (settings.contains("saved_journeys"))
-				saved_journeys = settings.getString("saved_journeys", null);
-			else
-				saved_journeys = "";
-			if (saved_journeys.contains(from.getText() + "," + to.getText()
-					+ ";")) {
-				menu.getItem(1).setVisible(false);
-				menu.getItem(2).setVisible(true);
-			} else {
-				menu.getItem(1).setVisible(true);
-				menu.getItem(2).setVisible(false);
-			}
-		} else {
-			menu.getItem(1).setVisible(false);
-			menu.getItem(2).setVisible(false);
-		}
-		return true;
-	}
-
-	public boolean find_nearest(int field) {
-		if (geolocation == null) {
-			Toast.makeText(getBaseContext(),
-					"Still acquiring your location, please wait",
-					Toast.LENGTH_LONG).show();
-			return true;
-		}
-		try {
-			String url = "http://ismytraindelayed.com/stations?lat="
-					+ geolocation.getLatitude() + "&lng="
-					+ geolocation.getLongitude();
-			JSONObject response = Utils.getJson(url);
-			final AutoCompleteTextView from = (AutoCompleteTextView) findViewById(R.id.from);
-			final AutoCompleteTextView to = (AutoCompleteTextView) findViewById(R.id.to);
-			if (response.getString("name").length() > 0) {
-				if (field == 0)
-					to.setText(response.getString("name"));
-				else
-					from.setText(response.getString("name"));
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return true;
-	}
 
 	/**
 	 * Called when the activity is first created.
@@ -245,91 +81,30 @@ public class IsMyTrainDelayedActivity extends Activity {
 				main.clearFocus();
 				InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
 				imm.hideSoftInputFromWindow(from.getWindowToken(), 0);
-				try {
-					String to_query = URLEncoder
-							.encode(to.getText().toString());
-					String from_query = URLEncoder.encode(from.getText()
-							.toString());
-					String url = "http://ojp.nationalrail.co.uk/service/ldb/liveTrainsJson?departing="
-							+ departing
-							+ "&liveTrainsFrom="
-							+ from_query
-							+ "&liveTrainsTo="
-							+ to_query
-							+ "&serviceId=abcdefghijk&from="
-							+ from_query
-							+ "&to=" + to_query;
-					JSONObject response = Utils.getJson(url);
-					if (response.getString("error") == "Failed") {
-						TableRow error = new TableRow(getBaseContext());
-						TextView error_msg = new TextView(getBaseContext());
-						error_msg
-								.setText("Sorry, unable to retrieve train times. Check network connection");
-						error.addView(error_msg);
-						results.addView(error, new TableLayout.LayoutParams(
-								LayoutParams.MATCH_PARENT,
-								LayoutParams.WRAP_CONTENT));
-					} else {
-						trains = response.getJSONArray("trains");
-					}
-					if (trains.length() == 0) {
-						TableRow error = new TableRow(getBaseContext());
-						TextView error_msg = new TextView(getBaseContext());
-						error_msg.setTextSize(14);
-						error_msg
-								.setText("Sorry, no train information for that journey");
-						error.addView(error_msg);
-						results.addView(error, new TableLayout.LayoutParams(
-								LayoutParams.MATCH_PARENT,
-								LayoutParams.WRAP_CONTENT));
-					}
-					for (int i = 0; i < trains.length(); i++) {
-						final JSONArray train = trains.getJSONArray(i);
-						TableRow row = new TableRow(getBaseContext());
-						// TRAIN TIME
-						TextView time = new TextView(getBaseContext());
-						time.setTextSize(18);
-						time.setTextColor(Color.parseColor("#0F2E4C"));
-						time.setText(Html.fromHtml(train.getString(1)));
-						row.addView(time);
-						// DESTINATION
-						TextView destination = new TextView(getBaseContext());
-						destination.setTextColor(Color.parseColor("#0F2E4C"));
-						destination.setTextSize(18);
-						destination.setText(Html.fromHtml(train.getString(2)));
-						destination.setPadding(5, 5, 5, 0);
-						row.addView(destination);
-						results.addView(row, new TableLayout.LayoutParams(
-								LayoutParams.MATCH_PARENT,
-								LayoutParams.WRAP_CONTENT));
-						// STATUS
-						TableRow status = new TableRow(getBaseContext());
-						TextView status_text = new TextView(getBaseContext());
-						TextView empty_cell = new TextView(getBaseContext());
-						status.addView(empty_cell);
-						status_text.setTextSize(14);
-						String status_string = Html
-								.fromHtml(train.getString(3)).toString()
-								.replace("<br/>", "-").replace("*", "");
-						String platform = "";
-						if (train.getString(4).length() != 0) {
-							platform = " (Platform "
-									+ train.getString(4).toString() + ")";
-						}
-						status_text.setText(status_string + platform);
-						if ((!(status_string.contains("On time")))
-								&& (!(status_string.contains("Starts here"))))
-							status_text.setTextColor(Color.RED);
-						status_text.setPadding(5, 0, 5, 5);
-						status.addView(status_text);
-						results.addView(status, new TableLayout.LayoutParams(
-								LayoutParams.MATCH_PARENT,
-								LayoutParams.WRAP_CONTENT));
-					}
 
-				} catch (Exception e) {
+				
+				new JourneyRequest().execute(journeyRequestUrl());
+
+			}
+
+			private String journeyRequestUrl() {
+				String url = "http://ojp.nationalrail.co.uk/service/ldb/liveTrainsJson?departing=" + departing;
+				try {
+
+				String to_query = URLEncoder.encode(to.getText().toString(), "UTF-8");
+				String from_query = URLEncoder.encode(from.getText().toString(), "UTF-8");
+						url = url + "&liveTrainsFrom="
+						+ from_query
+						+ "&liveTrainsTo="
+						+ to_query
+						+ "&serviceId=abcdefghijk&from="
+						+ from_query
+						+ "&to="
+						+ to_query;
+				} catch (UnsupportedEncodingException e) {
 					e.printStackTrace();
 				}
+				return url;
 			}
 		});
 
@@ -386,5 +161,274 @@ public class IsMyTrainDelayedActivity extends Activity {
 		locationManager.requestLocationUpdates(
 				LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
 
+	}
+
+	// SET UP MENU HANDLERS
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		MenuInflater inflater = getMenuInflater();
+		inflater.inflate(R.menu.menu, menu);
+		return true;
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		SharedPreferences.Editor editor = settings.edit();
+		switch (item.getItemId()) {
+		case R.id.nearest_from:
+			if (islocationReady()) {
+				new LocationRequest().execute(R.id.from);
+			}
+			return true;
+
+		case R.id.nearest_to:
+			if (islocationReady()) {
+				new LocationRequest().execute(R.id.to);
+			}
+			return true;
+
+		case R.id.saved_journeys:
+			restoreSavedJourneys();
+			return true;
+
+		case R.id.save_journey:
+			String saved_journeys;
+			if (settings.contains("saved_journeys"))
+				saved_journeys = settings.getString("saved_journeys", null);
+			else
+				saved_journeys = "";
+			editor.putString(
+					"saved_journeys",
+					saved_journeys.replace(from.getText() + "," + to.getText()
+							+ ";", ""));
+			editor.putString("saved_journeys", saved_journeys + from.getText()
+					+ "," + to.getText() + ";");
+			editor.commit();
+			Toast.makeText(getBaseContext(), "Journey Saved", Toast.LENGTH_LONG)
+					.show();
+			return true;
+
+		case R.id.delete_journey:
+			String saved_journeys2 = settings.getString("saved_journeys", null);
+			editor.putString(
+					"saved_journeys",
+					saved_journeys2.replace(from.getText() + "," + to.getText()
+							+ ";", ""));
+			editor.commit();
+			Toast.makeText(getBaseContext(), "Removed Saved Journey",
+					Toast.LENGTH_LONG).show();
+			return true;
+
+		default:
+			return super.onOptionsItemSelected(item);
+		}
+	}
+
+	private boolean islocationReady() {
+		if (geolocation == null) {
+			Toast.makeText(getBaseContext(),
+					"Still acquiring your location, please wait",
+					Toast.LENGTH_LONG).show();
+			return false;
+		} else {
+			return true;
+		}
+	}
+
+	@Override
+	public boolean onPrepareOptionsMenu(Menu menu) {
+		if (departing) {
+			menu.getItem(3).setTitle("From Nearest Station");
+			menu.getItem(4).setTitle("To Nearest Station");
+		} else {
+			menu.getItem(3).setTitle("Into Nearest Station");
+			menu.getItem(4).setTitle("From Nearest Station");
+		}
+		if ((from.getText().length() > 0) && (to.getText().length() > 0)) {
+			String saved_journeys;
+			if (settings.contains("saved_journeys"))
+				saved_journeys = settings.getString("saved_journeys", null);
+			else
+				saved_journeys = "";
+			if (saved_journeys.contains(from.getText() + "," + to.getText()
+					+ ";")) {
+				menu.getItem(1).setVisible(false);
+				menu.getItem(2).setVisible(true);
+			} else {
+				menu.getItem(1).setVisible(true);
+				menu.getItem(2).setVisible(false);
+			}
+		} else {
+			menu.getItem(1).setVisible(false);
+			menu.getItem(2).setVisible(false);
+		}
+		return true;
+	}
+
+	private String locationUrl() {
+		return "http://ismytraindelayed.com/stations?lat="
+				+ geolocation.getLatitude() + "&lng="
+				+ geolocation.getLongitude();
+	}
+
+	public void restoreSavedJourneys() {
+		LinearLayout main = (LinearLayout) findViewById(R.id.main);
+		main.setFocusableInTouchMode(true);
+		results.removeAllViews();
+		if ((settings.contains("saved_journeys"))
+				&& (settings.getString("saved_journeys", null).length() > 0)) {
+			TableRow journey_title = new TableRow(this);
+			TextView journey_title_text = new TextView(this);
+			journey_title_text.setText("Your Saved Journeys");
+			journey_title_text.setTextSize(24);
+			journey_title_text.setPadding(0, 10, 0, 0);
+			journey_title.addView(journey_title_text);
+			results.addView(journey_title, new TableLayout.LayoutParams(
+					LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+			String saved_journeys = settings.getString("saved_journeys", null);
+			String[] journeys = saved_journeys.split(";");
+			for (int a = 0; a < journeys.length; a++) {
+				final String[] string = journeys[a].split(",");
+				TableRow journey = new TableRow(this);
+				TextView journey_text = new TextView(this);
+				journey_text.setPadding(0, 5, 0, 5);
+				journey_text.setTextSize(18);
+				journey_text.setText(string[0] + " and " + string[1]);
+				journey.addView(journey_text);
+				results.addView(journey, new TableLayout.LayoutParams(
+						LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+				journey.setOnClickListener(new View.OnClickListener() {
+					public void onClick(View v) {
+						from.setText(string[0]);
+						to.setText(string[1]);
+						button.performClick();
+					}
+				});
+			}
+		} else {
+			TableRow journey_title = new TableRow(this);
+			TextView journey_title_text = new TextView(this);
+			journey_title_text.setText("No Saved Journeys");
+			journey_title_text.setTextSize(24);
+			journey_title_text.setPadding(0, 10, 0, 0);
+			journey_title.addView(journey_title_text);
+			results.addView(journey_title, new TableLayout.LayoutParams(
+					LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+			TableRow journey = new TableRow(this);
+			TextView journey_text = new TextView(this);
+			journey_text.setText("Save frequent journeys to save time");
+			journey_text.setTextSize(14);
+			journey.addView(journey_text);
+			results.addView(journey, new TableLayout.LayoutParams(
+					LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+		}
+	}
+
+	class JourneyRequest extends AsyncTask<String, String, JSONObject> {
+
+		@Override
+		protected JSONObject doInBackground(String... url) {
+			return Utils.getJson(url[0]);
+		}
+
+		@Override
+		protected void onPostExecute(JSONObject result) {
+			super.onPostExecute(result);
+			try {
+				if (result.getString("error") == "Failed") {
+					TableRow error = new TableRow(getBaseContext());
+					TextView error_msg = new TextView(getBaseContext());
+					error_msg
+							.setText("Sorry, unable to retrieve train times. Check network connection");
+					error.addView(error_msg);
+					results.addView(error, new TableLayout.LayoutParams(
+							LayoutParams.MATCH_PARENT,
+							LayoutParams.WRAP_CONTENT));
+				} else {
+					trains = result.getJSONArray("trains");
+				}
+				if (trains.length() == 0) {
+					TableRow error = new TableRow(getBaseContext());
+					TextView error_msg = new TextView(getBaseContext());
+					error_msg.setTextSize(14);
+					error_msg
+							.setText("Sorry, no train information for that journey");
+					error.addView(error_msg);
+					results.addView(error, new TableLayout.LayoutParams(
+							LayoutParams.MATCH_PARENT,
+							LayoutParams.WRAP_CONTENT));
+				}
+				for (int i = 0; i < trains.length(); i++) {
+					final JSONArray train = trains.getJSONArray(i);
+					TableRow row = new TableRow(getBaseContext());
+					// TRAIN TIME
+					TextView time = new TextView(getBaseContext());
+					time.setTextSize(18);
+					time.setTextColor(Color.parseColor("#0F2E4C"));
+					time.setText(Html.fromHtml(train.getString(1)));
+					row.addView(time);
+					// DESTINATION
+					TextView destination = new TextView(getBaseContext());
+					destination.setTextColor(Color.parseColor("#0F2E4C"));
+					destination.setTextSize(18);
+					destination.setText(Html.fromHtml(train.getString(2)));
+					destination.setPadding(5, 5, 5, 0);
+					row.addView(destination);
+					results.addView(row, new TableLayout.LayoutParams(
+							LayoutParams.MATCH_PARENT,
+							LayoutParams.WRAP_CONTENT));
+					// STATUS
+					TableRow status = new TableRow(getBaseContext());
+					TextView status_text = new TextView(getBaseContext());
+					TextView empty_cell = new TextView(getBaseContext());
+					status.addView(empty_cell);
+					status_text.setTextSize(14);
+					String status_string = Html.fromHtml(train.getString(3))
+							.toString().replace("<br/>", "-").replace("*", "");
+					String platform = "";
+					if (train.getString(4).length() != 0) {
+						platform = " (Platform "
+								+ train.getString(4).toString() + ")";
+					}
+					status_text.setText(status_string + platform);
+					if ((!(status_string.contains("On time")))
+							&& (!(status_string.contains("Starts here"))))
+						status_text.setTextColor(Color.RED);
+					status_text.setPadding(5, 0, 5, 5);
+					status.addView(status_text);
+					results.addView(status, new TableLayout.LayoutParams(
+							LayoutParams.MATCH_PARENT,
+							LayoutParams.WRAP_CONTENT));
+				}
+
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	class LocationRequest extends AsyncTask<Integer, String, JSONObject> {
+
+		private int id;
+
+		@Override
+		protected JSONObject doInBackground(Integer... id) {
+			this.id = id[0];
+			return Utils.getJson(locationUrl());
+		}
+
+		@Override
+		protected void onPostExecute(JSONObject result) {
+			super.onPostExecute(result);
+			AutoCompleteTextView v = (AutoCompleteTextView) findViewById(this.id);
+			try {
+				if (result.getString("name").length() > 0) {
+					v.setText(result.getString("name"));
+				}
+			} catch (JSONException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }
