@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Is My Train Delayed?</string>
+    <string name="action_settings">Settings</string>
+    <string name="departures">Departures</string>
+    <string name="arrivals">Arrivals</string>
+    <string name="from_required">From (Required)</string>
+    <string name="destination_optional">Destination (Optional)</string>
+
+</resources>
